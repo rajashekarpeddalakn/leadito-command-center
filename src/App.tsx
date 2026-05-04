@@ -5,6 +5,16 @@ import { Toaster } from "@/components/ui/toaster";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import Index from "./pages/Index.tsx";
 import NotFound from "./pages/NotFound.tsx";
+import Auth from "./pages/Auth.tsx";
+import AdminLayout from "./components/admin/AdminLayout.tsx";
+import Overview from "./pages/admin/Overview.tsx";
+import VideosPage from "./pages/admin/VideosPage.tsx";
+import TestimonialsPage from "./pages/admin/TestimonialsPage.tsx";
+import ServicesPage from "./pages/admin/ServicesPage.tsx";
+import PlansPage from "./pages/admin/PlansPage.tsx";
+import AdResultsPage from "./pages/admin/AdResultsPage.tsx";
+import LeadsPage from "./pages/admin/LeadsPage.tsx";
+import UsersPage from "./pages/admin/UsersPage.tsx";
 
 const queryClient = new QueryClient();
 
@@ -16,7 +26,17 @@ const App = () => (
       <BrowserRouter>
         <Routes>
           <Route path="/" element={<Index />} />
-          {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
+          <Route path="/auth" element={<Auth />} />
+          <Route path="/admin" element={<AdminLayout />}>
+            <Route index element={<Overview />} />
+            <Route path="videos" element={<VideosPage />} />
+            <Route path="testimonials" element={<TestimonialsPage />} />
+            <Route path="services" element={<ServicesPage />} />
+            <Route path="plans" element={<PlansPage />} />
+            <Route path="ads" element={<AdResultsPage />} />
+            <Route path="leads" element={<LeadsPage />} />
+            <Route path="users" element={<UsersPage />} />
+          </Route>
           <Route path="*" element={<NotFound />} />
         </Routes>
       </BrowserRouter>
