@@ -1,5 +1,4 @@
-import { useEffect, useState } from "react";
-import { supabase } from "@/integrations/supabase/client";
+import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -10,36 +9,26 @@ import { Switch } from "@/components/ui/switch";
 import { Plus, Pencil, Trash2, Play } from "lucide-react";
 import { toast } from "sonner";
 import { PageHeader } from "@/components/admin/PageHeader";
+import { db, useTable } from "@/lib/mockStore";
 
-type Video = { id: string; title: string; description: string | null; video_url: string; thumbnail_url: string | null; is_active: boolean; display_order: number };
-
-const empty = { title: "", description: "", video_url: "", thumbnail_url: "", is_active: true, display_order: 0 };
+const empty: any = { title: "", description: "", video_url: "", thumbnail_url: "", is_active: true, display_order: 0 };
 
 export default function VideosPage() {
-  const [items, setItems] = useState<Video[]>([]);
+  const items = [...useTable("videos")].sort((a, b) => a.display_order - b.display_order);
   const [open, setOpen] = useState(false);
   const [editing, setEditing] = useState<any>(empty);
 
-  const load = async () => {
-    const { data, error } = await supabase.from("videos").select("*").order("display_order");
-    if (error) toast.error(error.message); else setItems(data as any);
-  };
-  useEffect(() => { load(); }, []);
-
-  const save = async () => {
+  const save = () => {
     if (!editing.title || !editing.video_url) return toast.error("Title and video URL required");
     const payload = { ...editing, display_order: Number(editing.display_order) || 0 };
-    const { error } = editing.id
-      ? await supabase.from("videos").update(payload).eq("id", editing.id)
-      : await supabase.from("videos").insert(payload);
-    if (error) return toast.error(error.message);
-    toast.success("Saved"); setOpen(false); setEditing(empty); load();
+    if (editing.id) db.update("videos", editing.id, payload);
+    else db.insert("videos", payload);
+    toast.success("Saved"); setOpen(false); setEditing(empty);
   };
 
-  const remove = async (id: string) => {
+  const remove = (id: string) => {
     if (!confirm("Delete this video?")) return;
-    const { error } = await supabase.from("videos").delete().eq("id", id);
-    if (error) toast.error(error.message); else { toast.success("Deleted"); load(); }
+    db.remove("videos", id); toast.success("Deleted");
   };
 
   return (

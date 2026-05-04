@@ -1,7 +1,6 @@
 import { NavLink, useLocation } from "react-router-dom";
-import { LayoutDashboard, Video, MessageSquareQuote, Sparkles, BarChart3, Users, CreditCard, ContactRound, LogOut } from "lucide-react";
-import { Sidebar, SidebarContent, SidebarGroup, SidebarGroupContent, SidebarGroupLabel, SidebarMenu, SidebarMenuButton, SidebarMenuItem, SidebarHeader, SidebarFooter, useSidebar } from "@/components/ui/sidebar";
-import { useAuth } from "@/hooks/useAuth";
+import { LayoutDashboard, Video, MessageSquareQuote, Sparkles, BarChart3, Users, CreditCard, ContactRound } from "lucide-react";
+import { Sidebar, SidebarContent, SidebarGroup, SidebarGroupContent, SidebarGroupLabel, SidebarMenu, SidebarMenuButton, SidebarMenuItem, SidebarHeader, useSidebar } from "@/components/ui/sidebar";
 import logo from "@/assets/leadito-logo.png";
 
 const items = [
@@ -19,7 +18,6 @@ export function AdminSidebar() {
   const { state } = useSidebar();
   const collapsed = state === "collapsed";
   const { pathname } = useLocation();
-  const { signOut } = useAuth();
 
   return (
     <Sidebar collapsible="icon">
@@ -56,16 +54,6 @@ export function AdminSidebar() {
           </SidebarGroupContent>
         </SidebarGroup>
       </SidebarContent>
-      <SidebarFooter className="border-t border-sidebar-border">
-        <SidebarMenu>
-          <SidebarMenuItem>
-            <SidebarMenuButton onClick={() => signOut()}>
-              <LogOut className="h-4 w-4" />
-              {!collapsed && <span>Sign out</span>}
-            </SidebarMenuButton>
-          </SidebarMenuItem>
-        </SidebarMenu>
-      </SidebarFooter>
     </Sidebar>
   );
 }
