@@ -1,50 +1,67 @@
-import { useEffect, useState } from "react";
-import { supabase } from "@/integrations/supabase/client";
-import { Card, CardContent } from "@/components/ui/card";
+import { useState } from "react";
+import { Card } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogFooter } from "@/components/ui/dialog";
 import { toast } from "sonner";
 import { PageHeader } from "@/components/admin/PageHeader";
-import { Shield, ShieldOff } from "lucide-react";
+import { Shield, ShieldOff, Plus, Pencil, Trash2 } from "lucide-react";
+import { db, useTable } from "@/lib/mockStore";
+
+const empty: any = { full_name: "", email: "", phone: "", company: "", role: "user" };
 
 export default function UsersPage() {
-  const [rows, setRows] = useState<any[]>([]);
-  const [adminIds, setAdminIds] = useState<Set<string>>(new Set());
-  const [stats, setStats] = useState<Record<string, { leads: number; revenue: number }>>({});
+  const users = useTable("users");
+  const leads = useTable("leads");
+  const ads = useTable("ad_results");
+  const [open, setOpen] = useState(false);
+  const [editing, setEditing] = useState<any>(empty);
 
-  const load = async () => {
-    const [{ data: profiles }, { data: roles }, { data: leads }, { data: ads }] = await Promise.all([
-      supabase.from("profiles").select("*").order("created_at", { ascending: false }),
-      supabase.from("user_roles").select("user_id,role").eq("role", "admin"),
-      supabase.from("leads").select("user_id"),
-      supabase.from("ad_results").select("user_id,revenue"),
-    ]);
-    setRows(profiles ?? []);
-    setAdminIds(new Set((roles ?? []).map(r => r.user_id)));
-    const s: Record<string, { leads: number; revenue: number }> = {};
-    (leads ?? []).forEach(l => { s[l.user_id] = s[l.user_id] || { leads: 0, revenue: 0 }; s[l.user_id].leads++; });
-    (ads ?? []).forEach(a => { s[a.user_id] = s[a.user_id] || { leads: 0, revenue: 0 }; s[a.user_id].revenue += Number(a.revenue || 0); });
-    setStats(s);
+  const stats: Record<string, { leads: number; revenue: number }> = {};
+  leads.forEach(l => { stats[l.user_id] = stats[l.user_id] || { leads: 0, revenue: 0 }; stats[l.user_id].leads++; });
+  ads.forEach(a => { stats[a.user_id] = stats[a.user_id] || { leads: 0, revenue: 0 }; stats[a.user_id].revenue += Number(a.revenue || 0); });
+
+  const toggleAdmin = (id: string, current: string) => {
+    db.update("users", id, { role: current === "admin" ? "user" : "admin" } as any);
+    toast.success(current === "admin" ? "Demoted to user" : "Promoted to admin");
   };
-  useEffect(() => { load(); }, []);
 
-  const toggleAdmin = async (userId: string) => {
-    if (adminIds.has(userId)) {
-      const { error } = await supabase.from("user_roles").delete().eq("user_id", userId).eq("role", "admin");
-      if (error) return toast.error(error.message);
-      toast.success("Admin role removed");
-    } else {
-      const { error } = await supabase.from("user_roles").insert({ user_id: userId, role: "admin" });
-      if (error) return toast.error(error.message);
-      toast.success("Promoted to admin");
-    }
-    load();
+  const save = () => {
+    if (!editing.full_name || !editing.email) return toast.error("Name and email required");
+    if (editing.id) db.update("users", editing.id, editing);
+    else db.insert("users", editing);
+    toast.success("Saved"); setOpen(false); setEditing(empty);
+  };
+
+  const remove = (id: string) => {
+    if (!confirm("Delete this user?")) return;
+    db.remove("users", id); toast.success("Deleted");
   };
 
   return (
     <div>
-      <PageHeader title="Users" description="All registered users and their activity." />
+      <PageHeader title="Users" description="All registered users and their activity."
+        action={
+          <Dialog open={open} onOpenChange={(o) => { setOpen(o); if (!o) setEditing(empty); }}>
+            <DialogTrigger asChild><Button onClick={() => setEditing(empty)}><Plus className="w-4 h-4 mr-2" />Add user</Button></DialogTrigger>
+            <DialogContent>
+              <DialogHeader><DialogTitle>{editing.id ? "Edit" : "Add"} user</DialogTitle></DialogHeader>
+              <div className="space-y-3">
+                <div><Label>Full name</Label><Input value={editing.full_name} onChange={e => setEditing({ ...editing, full_name: e.target.value })} /></div>
+                <div><Label>Email</Label><Input value={editing.email} onChange={e => setEditing({ ...editing, email: e.target.value })} /></div>
+                <div className="grid grid-cols-2 gap-3">
+                  <div><Label>Phone</Label><Input value={editing.phone} onChange={e => setEditing({ ...editing, phone: e.target.value })} /></div>
+                  <div><Label>Company</Label><Input value={editing.company} onChange={e => setEditing({ ...editing, company: e.target.value })} /></div>
+                </div>
+              </div>
+              <DialogFooter><Button onClick={save}>Save</Button></DialogFooter>
+            </DialogContent>
+          </Dialog>
+        }
+      />
       <Card className="shadow-card">
         <Table>
           <TableHeader>
@@ -55,8 +72,8 @@ export default function UsersPage() {
             </TableRow>
           </TableHeader>
           <TableBody>
-            {rows.map(u => {
-              const isAdmin = adminIds.has(u.id);
+            {users.map(u => {
+              const isAdmin = u.role === "admin";
               const s = stats[u.id] || { leads: 0, revenue: 0 };
               return (
                 <TableRow key={u.id}>
@@ -71,14 +88,18 @@ export default function UsersPage() {
                   <TableCell className="text-success">₹{s.revenue.toLocaleString()}</TableCell>
                   <TableCell className="text-xs text-muted-foreground">{new Date(u.created_at).toLocaleDateString()}</TableCell>
                   <TableCell>
-                    <Button size="sm" variant="outline" onClick={() => toggleAdmin(u.id)}>
-                      {isAdmin ? <><ShieldOff className="w-3 h-3 mr-1" />Demote</> : <><Shield className="w-3 h-3 mr-1" />Make admin</>}
-                    </Button>
+                    <div className="flex gap-1">
+                      <Button size="sm" variant="outline" onClick={() => toggleAdmin(u.id, u.role)}>
+                        {isAdmin ? <ShieldOff className="w-3 h-3" /> : <Shield className="w-3 h-3" />}
+                      </Button>
+                      <Button size="sm" variant="ghost" onClick={() => { setEditing(u); setOpen(true); }}><Pencil className="w-3 h-3" /></Button>
+                      <Button size="sm" variant="ghost" onClick={() => remove(u.id)}><Trash2 className="w-3 h-3" /></Button>
+                    </div>
                   </TableCell>
                 </TableRow>
               );
             })}
-            {!rows.length && <TableRow><TableCell colSpan={9} className="text-center text-muted-foreground py-10">No users yet.</TableCell></TableRow>}
+            {!users.length && <TableRow><TableCell colSpan={9} className="text-center text-muted-foreground py-10">No users yet.</TableCell></TableRow>}
           </TableBody>
         </Table>
       </Card>

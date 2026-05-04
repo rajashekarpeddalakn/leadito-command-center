@@ -1,5 +1,4 @@
-import { useEffect, useState } from "react";
-import { supabase } from "@/integrations/supabase/client";
+import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -10,34 +9,26 @@ import { Switch } from "@/components/ui/switch";
 import { Plus, Pencil, Trash2, Sparkles } from "lucide-react";
 import { toast } from "sonner";
 import { PageHeader } from "@/components/admin/PageHeader";
+import { db, useTable } from "@/lib/mockStore";
 
-const empty = { title: "", description: "", icon: "Sparkles", image_url: "", is_active: true, display_order: 0 };
+const empty: any = { title: "", description: "", icon: "Sparkles", image_url: "", is_active: true, display_order: 0 };
 
 export default function ServicesPage() {
-  const [items, setItems] = useState<any[]>([]);
+  const items = [...useTable("services")].sort((a, b) => a.display_order - b.display_order);
   const [open, setOpen] = useState(false);
   const [editing, setEditing] = useState<any>(empty);
 
-  const load = async () => {
-    const { data, error } = await supabase.from("services").select("*").order("display_order");
-    if (error) toast.error(error.message); else setItems(data ?? []);
-  };
-  useEffect(() => { load(); }, []);
-
-  const save = async () => {
+  const save = () => {
     if (!editing.title) return toast.error("Title required");
     const payload = { ...editing, display_order: Number(editing.display_order) || 0 };
-    const { error } = editing.id
-      ? await supabase.from("services").update(payload).eq("id", editing.id)
-      : await supabase.from("services").insert(payload);
-    if (error) return toast.error(error.message);
-    toast.success("Saved"); setOpen(false); setEditing(empty); load();
+    if (editing.id) db.update("services", editing.id, payload);
+    else db.insert("services", payload);
+    toast.success("Saved"); setOpen(false); setEditing(empty);
   };
 
-  const remove = async (id: string) => {
+  const remove = (id: string) => {
     if (!confirm("Delete?")) return;
-    const { error } = await supabase.from("services").delete().eq("id", id);
-    if (error) toast.error(error.message); else { toast.success("Deleted"); load(); }
+    db.remove("services", id); toast.success("Deleted");
   };
 
   return (

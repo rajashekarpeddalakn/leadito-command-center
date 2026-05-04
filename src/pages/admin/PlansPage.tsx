@@ -1,5 +1,4 @@
-import { useEffect, useState } from "react";
-import { supabase } from "@/integrations/supabase/client";
+import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -11,19 +10,14 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Plus, Pencil, Trash2, Check, Crown } from "lucide-react";
 import { toast } from "sonner";
 import { PageHeader } from "@/components/admin/PageHeader";
+import { db, useTable } from "@/lib/mockStore";
 
-const empty = { name: "", description: "", price: 0, currency: "INR", billing_period: "monthly", features: "", is_popular: false, is_active: true, display_order: 0 };
+const empty: any = { name: "", description: "", price: 0, currency: "INR", billing_period: "monthly", features: "", is_popular: false, is_active: true, display_order: 0 };
 
 export default function PlansPage() {
-  const [items, setItems] = useState<any[]>([]);
+  const items = [...useTable("plans")].sort((a, b) => a.display_order - b.display_order);
   const [open, setOpen] = useState(false);
   const [editing, setEditing] = useState<any>(empty);
-
-  const load = async () => {
-    const { data, error } = await supabase.from("plans").select("*").order("display_order");
-    if (error) toast.error(error.message); else setItems(data ?? []);
-  };
-  useEffect(() => { load(); }, []);
 
   const openEdit = (p?: any) => {
     if (p) setEditing({ ...p, features: Array.isArray(p.features) ? p.features.join("\n") : "" });
@@ -31,21 +25,18 @@ export default function PlansPage() {
     setOpen(true);
   };
 
-  const save = async () => {
+  const save = () => {
     if (!editing.name) return toast.error("Name required");
     const features = String(editing.features || "").split("\n").map((s: string) => s.trim()).filter(Boolean);
     const payload = { ...editing, price: Number(editing.price) || 0, display_order: Number(editing.display_order) || 0, features };
-    const { error } = editing.id
-      ? await supabase.from("plans").update(payload).eq("id", editing.id)
-      : await supabase.from("plans").insert(payload);
-    if (error) return toast.error(error.message);
-    toast.success("Saved"); setOpen(false); setEditing(empty); load();
+    if (editing.id) db.update("plans", editing.id, payload);
+    else db.insert("plans", payload);
+    toast.success("Saved"); setOpen(false); setEditing(empty);
   };
 
-  const remove = async (id: string) => {
+  const remove = (id: string) => {
     if (!confirm("Delete?")) return;
-    const { error } = await supabase.from("plans").delete().eq("id", id);
-    if (error) toast.error(error.message); else { toast.success("Deleted"); load(); }
+    db.remove("plans", id); toast.success("Deleted");
   };
 
   return (

@@ -11,7 +11,7 @@ const Index = () => {
           <img src={logo} alt="Leadito AI logo" className="w-10 h-10 rounded-xl shadow-card" />
           <span className="font-bold text-lg">Leadito AI</span>
         </div>
-        <Link to="/auth"><Button variant="outline">Admin sign in</Button></Link>
+        <Link to="/admin"><Button variant="outline">Open admin</Button></Link>
       </header>
 
       <main className="container py-16 md:py-24 text-center">
@@ -25,7 +25,7 @@ const Index = () => {
           Manage videos, testimonials, services, plans, ad results and CRM leads — all from one beautiful Leadito AI admin dashboard.
         </p>
         <div className="flex items-center justify-center gap-3">
-          <Link to="/auth"><Button size="lg" className="gradient-primary border-0 shadow-elegant">Open dashboard <ArrowRight className="w-4 h-4 ml-2" /></Button></Link>
+          <Link to="/admin"><Button size="lg" className="gradient-primary border-0 shadow-elegant">Open dashboard <ArrowRight className="w-4 h-4 ml-2" /></Button></Link>
         </div>
 
         <div className="grid md:grid-cols-3 gap-4 mt-20 max-w-4xl mx-auto text-left">

@@ -1,5 +1,4 @@
-import { useEffect, useState } from "react";
-import { supabase } from "@/integrations/supabase/client";
+import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -11,48 +10,36 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Plus, Pencil, Trash2 } from "lucide-react";
 import { toast } from "sonner";
 import { PageHeader } from "@/components/admin/PageHeader";
+import { db, useTable } from "@/lib/mockStore";
 
-const empty = { user_id: "", campaign_name: "", period_start: "", period_end: "", budget_spent: 0, leads: 0, cost_per_lead: 0, closed_deals: 0, revenue: 0, roi: 0, notes: "" };
+const empty: any = { user_id: "", campaign_name: "", period_start: "", period_end: "", budget_spent: 0, leads: 0, cost_per_lead: 0, closed_deals: 0, revenue: 0, roi: 0, notes: "" };
 
 export default function AdResultsPage() {
-  const [rows, setRows] = useState<any[]>([]);
-  const [users, setUsers] = useState<any[]>([]);
+  const allRows = useTable("ad_results");
+  const users = useTable("users").filter(u => u.role !== "admin");
   const [filter, setFilter] = useState<string>("all");
   const [open, setOpen] = useState(false);
   const [editing, setEditing] = useState<any>(empty);
 
-  const load = async () => {
-    const { data: u } = await supabase.from("profiles").select("id,email,full_name");
-    setUsers(u ?? []);
-    let q = supabase.from("ad_results").select("*").order("created_at", { ascending: false });
-    if (filter !== "all") q = q.eq("user_id", filter);
-    const { data, error } = await q;
-    if (error) toast.error(error.message); else setRows(data ?? []);
-  };
-  useEffect(() => { load(); }, [filter]);
+  const rows = filter === "all" ? allRows : allRows.filter(r => r.user_id === filter);
 
   const userLabel = (id: string) => {
-    const u = users.find(x => x.id === id);
+    const u = useTable("users").find(x => x.id === id);
     return u ? (u.full_name || u.email) : id.slice(0, 8);
   };
 
-  const save = async () => {
+  const save = () => {
     if (!editing.user_id || !editing.campaign_name) return toast.error("User and campaign required");
     const payload: any = { ...editing };
     ["budget_spent", "leads", "cost_per_lead", "closed_deals", "revenue", "roi"].forEach(k => payload[k] = Number(payload[k]) || 0);
-    if (!payload.period_start) payload.period_start = null;
-    if (!payload.period_end) payload.period_end = null;
-    const { error } = editing.id
-      ? await supabase.from("ad_results").update(payload).eq("id", editing.id)
-      : await supabase.from("ad_results").insert(payload);
-    if (error) return toast.error(error.message);
-    toast.success("Saved"); setOpen(false); setEditing(empty); load();
+    if (editing.id) db.update("ad_results", editing.id, payload);
+    else db.insert("ad_results", payload);
+    toast.success("Saved"); setOpen(false); setEditing(empty);
   };
 
-  const remove = async (id: string) => {
+  const remove = (id: string) => {
     if (!confirm("Delete?")) return;
-    const { error } = await supabase.from("ad_results").delete().eq("id", id);
-    if (error) toast.error(error.message); else { toast.success("Deleted"); load(); }
+    db.remove("ad_results", id); toast.success("Deleted");
   };
 
   const totals = rows.reduce((a, r) => ({
