@@ -1,168 +1,148 @@
-import { useMemo, useState } from "react";
-import { Button } from "@/components/ui/button";
+import { useState, useEffect } from "react";
+import { Card } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
-import { Textarea } from "@/components/ui/textarea";
-import { Card, CardContent } from "@/components/ui/card";
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogFooter } from "@/components/ui/dialog";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
-import { Plus, Pencil, Trash2 } from "lucide-react";
-import { toast } from "sonner";
+import { Button } from "@/components/ui/button";
+import { Search, ChevronRight, User as UserIcon, Phone, Building2, Loader2, Users, ChevronLeft } from "lucide-react";
+import { useNavigate } from "react-router-dom";
 import { PageHeader } from "@/components/admin/PageHeader";
-import { db, useTable, LeadStatus } from "@/lib/mockStore";
-
-const STATUSES: LeadStatus[] = ["new", "converted", "on_hold", "not_interested", "not_answered", "follow_up", "closed", "appointment_booked"];
-
-const statusColor: Record<string, string> = {
-  new: "bg-info/15 text-info",
-  converted: "bg-success/15 text-success",
-  on_hold: "bg-warning/15 text-warning",
-  not_interested: "bg-destructive/15 text-destructive",
-  not_answered: "bg-muted text-muted-foreground",
-  follow_up: "bg-primary/15 text-primary",
-  closed: "bg-success/15 text-success",
-  appointment_booked: "bg-accent text-accent-foreground",
-};
-
-const niceStatus = (s: string) => s.replace(/_/g, " ").replace(/\b\w/g, c => c.toUpperCase());
-
-const empty: any = { user_id: "", name: "", phone: "", email: "", source: "Facebook", status: "new", follow_up_date: "", deal_value: 0, notes: "" };
+import usersService from "@/service/users";
+import { toast } from "sonner";
 
 export default function LeadsPage() {
-  const allRows = useTable("leads");
-  const users = useTable("users").filter(u => u.role !== "admin");
-  const [filter, setFilter] = useState<string>("all");
-  const [open, setOpen] = useState(false);
-  const [editing, setEditing] = useState<any>(empty);
+  const [users, setUsers] = useState<any[]>([]);
+  const [fetching, setFetching] = useState(true);
+  const [searchQuery, setSearchQuery] = useState("");
+  const [page, setPage] = useState(1);
+  const [pagination, setPagination] = useState({ totalPages: 1, totalUsers: 0 });
+  const navigate = useNavigate();
 
-  const rows = filter === "all" ? allRows : allRows.filter(r => r.user_id === filter);
+  useEffect(() => {
+    fetchUsers(page);
+  }, [page, searchQuery]);
 
-  const userLabel = (id: string) => {
-    const u = users.find(x => x.id === id);
-    return u ? (u.full_name || u.email) : id.slice(0, 8);
-  };
-
-  const counts = useMemo(() => {
-    const c: Record<string, number> = {};
-    STATUSES.forEach(s => c[s] = 0);
-    rows.forEach(r => { c[r.status] = (c[r.status] || 0) + 1; });
-    return c;
-  }, [rows]);
-
-  const save = () => {
-    if (!editing.user_id || !editing.name) return toast.error("User and lead name required");
-    const payload = { ...editing, deal_value: Number(editing.deal_value) || 0 };
-    if (editing.id) db.update("leads", editing.id, payload);
-    else db.insert("leads", payload);
-    toast.success("Saved"); setOpen(false); setEditing(empty);
-  };
-
-  const remove = (id: string) => {
-    if (!confirm("Delete?")) return;
-    db.remove("leads", id); toast.success("Deleted");
+  const fetchUsers = async (pageNum = 1) => {
+    try {
+      setFetching(true);
+      const data = await usersService.listUsers({
+        isActive: true,
+        limit: 5,
+        page: pageNum,
+        search: searchQuery // Backend should support search in users list too
+      });
+      setUsers(data.users || []);
+      setPagination(data.pagination || { totalPages: 1, totalUsers: 0 });
+    } catch (error) {
+      toast.error("Failed to load active members");
+    } finally {
+      setFetching(false);
+    }
   };
 
   return (
-    <div>
-      <PageHeader title="CRM Leads" description="Lead pipeline submitted by users from the app."
-        action={
-          <Dialog open={open} onOpenChange={(o) => { setOpen(o); if (!o) setEditing(empty); }}>
-            <DialogTrigger asChild><Button onClick={() => setEditing(empty)}><Plus className="w-4 h-4 mr-2" />Add lead</Button></DialogTrigger>
-            <DialogContent className="max-w-2xl">
-              <DialogHeader><DialogTitle>{editing.id ? "Edit" : "Add"} lead</DialogTitle></DialogHeader>
-              <div className="space-y-3">
-                <div className="grid grid-cols-2 gap-3">
-                  <div>
-                    <Label>User</Label>
-                    <Select value={editing.user_id} onValueChange={(v) => setEditing({ ...editing, user_id: v })}>
-                      <SelectTrigger><SelectValue placeholder="Select user" /></SelectTrigger>
-                      <SelectContent>{users.map(u => <SelectItem key={u.id} value={u.id}>{u.full_name || u.email}</SelectItem>)}</SelectContent>
-                    </Select>
-                  </div>
-                  <div><Label>Lead name</Label><Input value={editing.name} onChange={e => setEditing({ ...editing, name: e.target.value })} /></div>
-                </div>
-                <div className="grid grid-cols-2 gap-3">
-                  <div><Label>Phone</Label><Input value={editing.phone} onChange={e => setEditing({ ...editing, phone: e.target.value })} /></div>
-                  <div><Label>Email</Label><Input value={editing.email} onChange={e => setEditing({ ...editing, email: e.target.value })} /></div>
-                </div>
-                <div className="grid grid-cols-3 gap-3">
-                  <div><Label>Source</Label><Input value={editing.source} onChange={e => setEditing({ ...editing, source: e.target.value })} /></div>
-                  <div>
-                    <Label>Status</Label>
-                    <Select value={editing.status} onValueChange={(v) => setEditing({ ...editing, status: v })}>
-                      <SelectTrigger><SelectValue /></SelectTrigger>
-                      <SelectContent>
-                        {STATUSES.map(s => <SelectItem key={s} value={s}>{niceStatus(s)}</SelectItem>)}
-                      </SelectContent>
-                    </Select>
-                  </div>
-                  <div><Label>Deal value</Label><Input type="number" value={editing.deal_value} onChange={e => setEditing({ ...editing, deal_value: e.target.value })} /></div>
-                </div>
-                <div><Label>Follow-up date</Label><Input type="date" value={editing.follow_up_date ?? ""} onChange={e => setEditing({ ...editing, follow_up_date: e.target.value })} /></div>
-                <div><Label>Notes</Label><Textarea value={editing.notes ?? ""} onChange={e => setEditing({ ...editing, notes: e.target.value })} /></div>
-              </div>
-              <DialogFooter><Button onClick={save}>Save</Button></DialogFooter>
-            </DialogContent>
-          </Dialog>
-        }
-      />
+    <div className="animate-fade-in space-y-6">
+      <PageHeader title="CRM Leads" description="Select an active business account to manage campaign leads (5 per page optimization)." />
 
-      <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-8 gap-2 mb-4">
-        {STATUSES.map(s => (
-          <Card key={s} className="shadow-card">
-            <CardContent className="p-3">
-              <p className="text-[10px] text-muted-foreground uppercase tracking-wider">{niceStatus(s)}</p>
-              <p className="text-xl font-bold">{counts[s] || 0}</p>
-            </CardContent>
-          </Card>
-        ))}
+      <div className="flex flex-col md:flex-row items-center justify-between gap-4 bg-background p-4 rounded-xl border shadow-sm">
+        <div className="relative flex-1 max-w-2xl w-full">
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+          <Input
+            value={searchQuery}
+            onChange={e => { setSearchQuery(e.target.value); setPage(1); }}
+            placeholder="Search by business name, owner or phone..."
+            className="pl-10 h-10 bg-background border-border"
+          />
+        </div>
+        <div className="flex items-center gap-3">
+          <Badge variant="secondary" className="px-3 py-1.5 text-xs font-bold gap-2">
+            <Users className="w-4 h-4" /> {pagination.totalUsers} Total Accounts
+          </Badge>
+        </div>
       </div>
 
-      <div className="mb-3 flex items-center gap-3">
-        <Label>Filter by user:</Label>
-        <Select value={filter} onValueChange={setFilter}>
-          <SelectTrigger className="w-[280px]"><SelectValue /></SelectTrigger>
-          <SelectContent>
-            <SelectItem value="all">All users</SelectItem>
-            {users.map(u => <SelectItem key={u.id} value={u.id}>{u.full_name || u.email}</SelectItem>)}
-          </SelectContent>
-        </Select>
-      </div>
-
-      <Card className="shadow-card">
-        <Table>
-          <TableHeader>
-            <TableRow>
-              <TableHead>User</TableHead><TableHead>Lead name</TableHead><TableHead>Phone</TableHead>
-              <TableHead>Email</TableHead><TableHead>Source</TableHead><TableHead>Status</TableHead>
-              <TableHead>Follow-up</TableHead><TableHead>Deal value</TableHead><TableHead></TableHead>
-            </TableRow>
-          </TableHeader>
-          <TableBody>
-            {rows.map(r => (
-              <TableRow key={r.id}>
-                <TableCell className="font-medium">{userLabel(r.user_id)}</TableCell>
-                <TableCell>{r.name}</TableCell>
-                <TableCell>{r.phone}</TableCell>
-                <TableCell>{r.email}</TableCell>
-                <TableCell>{r.source}</TableCell>
-                <TableCell><Badge className={`${statusColor[r.status]} border-0`}>{niceStatus(r.status)}</Badge></TableCell>
-                <TableCell>{r.follow_up_date || "—"}</TableCell>
-                <TableCell>₹{Number(r.deal_value || 0).toLocaleString()}</TableCell>
-                <TableCell>
-                  <div className="flex gap-1">
-                    <Button size="sm" variant="ghost" onClick={() => { setEditing(r); setOpen(true); }}><Pencil className="w-3 h-3" /></Button>
-                    <Button size="sm" variant="ghost" onClick={() => remove(r.id)}><Trash2 className="w-3 h-3" /></Button>
+      <div className="grid grid-cols-1 gap-3">
+        {fetching ? (
+          <div className="h-64 flex flex-col items-center justify-center gap-4 text-muted-foreground">
+            <Loader2 className="w-8 h-8 animate-spin" />
+            <p className="font-medium animate-pulse text-sm">Synchronizing business directory...</p>
+          </div>
+        ) : users.length > 0 ? (
+          <>
+            {users.map(user => (
+              <Card key={user.id} className="shadow-sm border-border/40 overflow-hidden transition-all hover:bg-accent/5 rounded-xl">
+                <div className="p-3.5 flex items-center justify-between">
+                  <div className="flex items-center gap-4">
+                    <div className="h-10 w-10 bg-muted/50 rounded-lg flex items-center justify-center border shrink-0">
+                      <Building2 className="w-5 h-5 text-muted-foreground" />
+                    </div>
+                    <div className="flex flex-col">
+                      <div className="flex items-center gap-2">
+                        <h3 className="font-bold text-[14px] text-foreground leading-none">{user.businessName || "Private Business"}</h3>
+                        <Badge className="bg-emerald-50 text-emerald-600 border-emerald-100 font-bold text-[8px] uppercase tracking-tighter h-4 px-1.5">Active</Badge>
+                      </div>
+                      <div className="flex items-center gap-2.5 text-[11px] font-medium text-muted-foreground mt-1">
+                        <div className="flex items-center gap-1"><UserIcon className="w-3 h-3 opacity-60" /> {user.name}</div>
+                        <span className="opacity-30">•</span>
+                        <div className="flex items-center gap-1"><Phone className="w-3 h-3 opacity-60" /> {user.phone}</div>
+                      </div>
+                    </div>
                   </div>
-                </TableCell>
-              </TableRow>
+
+                  <Button
+                    onClick={() => navigate(`/admin/leads/${user.id}`)}
+                    variant="outline"
+                    size="sm"
+                    className="h-8 px-3 rounded-lg hover:bg-primary hover:text-white transition-all shadow-sm font-bold text-xs"
+                  >
+                    Manage
+                    <ChevronRight className="w-3.5 h-3.5 ml-1" />
+                  </Button>
+                </div>
+              </Card>
             ))}
-            {!rows.length && <TableRow><TableCell colSpan={9} className="text-center text-muted-foreground py-10">No leads yet.</TableCell></TableRow>}
-          </TableBody>
-        </Table>
-      </Card>
+
+            {/* Pagination Controls */}
+            {pagination.totalPages > 1 && (
+              <div className="pt-4 flex items-center justify-between px-1">
+                <div className="text-xs font-bold text-muted-foreground uppercase tracking-widest bg-muted/50 px-4 py-2 rounded-lg">
+                  Page {page} <span className="opacity-40 mx-1">of</span> {pagination.totalPages}
+                </div>
+                <div className="flex items-center gap-2">
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    disabled={page === 1 || fetching}
+                    onClick={() => setPage(p => Math.max(1, p - 1))}
+                    className="h-9 px-4 font-bold rounded-lg transition-all"
+                  >
+                    <ChevronLeft className="w-4 h-4 mr-1" /> Previous
+                  </Button>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    disabled={page === pagination.totalPages || fetching}
+                    onClick={() => setPage(p => Math.min(pagination.totalPages, p + 1))}
+                    className="h-9 px-4 font-bold rounded-lg transition-all"
+                  >
+                    Next <ChevronRight className="w-4 h-4 ml-1" />
+                  </Button>
+                </div>
+              </div>
+            )}
+          </>
+        ) : (
+          <div className="text-center py-20 bg-muted/30 rounded-xl border-2 border-dashed border-border/60 flex flex-col items-center gap-4">
+            <Search className="w-10 h-10 text-muted-foreground/30" />
+            <div className="space-y-1">
+              <p className="font-bold text-muted-foreground">No accounts matched</p>
+              <p className="text-sm text-muted-foreground/60">Try adjusting your search criteria</p>
+            </div>
+            <Button variant="outline" size="sm" onClick={() => { setSearchQuery(""); setPage(1); }} className="rounded-lg mt-2 font-bold">
+              Clear Search
+            </Button>
+          </div>
+        )}
+      </div>
     </div>
   );
 }
