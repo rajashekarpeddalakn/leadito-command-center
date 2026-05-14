@@ -13,6 +13,7 @@ const items = [
   { title: "Plans & Pricing", url: "/admin/plans", icon: CreditCard },
   { title: "Ad Results", url: "/admin/ads", icon: BarChart3 },
   { title: "CRM Leads", url: "/admin/leads", icon: ContactRound },
+  { title: "Pending Approvals", url: "/admin/approvals", icon: CreditCard },
   { title: "Users", url: "/admin/users", icon: Users },
 ];
 

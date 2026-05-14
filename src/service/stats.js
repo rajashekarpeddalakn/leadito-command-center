@@ -14,6 +14,17 @@ const getDashboardStats = async () => {
     }
 };
 
+const updateManualRevenue = async (data) => {
+    try {
+        const response = await api.patch('admin/settings', data);
+        return response.data;
+    } catch (error) {
+        console.error('Update setting error:', error);
+        throw error;
+    }
+};
+
 export default {
-    getDashboardStats
+    getDashboardStats,
+    updateManualRevenue
 };

@@ -34,22 +34,42 @@ const activateUser = async (id, planId) => {
     }
 };
 
-const deactivateUser = async (id) => {
+const toggleStatus = async (id) => {
     try {
-        const response = await api.patch(`admin/users/${id}/deactivate`);
+        const response = await api.patch(`admin/users/${id}/toggle-status`);
         return response.data;
     } catch (error) {
-        console.error('Deactivate user error:', error);
+        console.error('Toggle status error:', error);
         throw error;
     }
 };
 
-const deleteUser = async (id) => {
+const listPendingSubscriptions = async () => {
     try {
-        const response = await api.delete(`admin/users/${id}`);
+        const response = await api.get('admin/subscriptions/pending');
         return response.data;
     } catch (error) {
-        console.error('Delete user error:', error);
+        console.error('List pending subscriptions error:', error);
+        throw error;
+    }
+};
+
+const approveSubscription = async (subId) => {
+    try {
+        const response = await api.post(`admin/subscriptions/${subId}/approve`);
+        return response.data;
+    } catch (error) {
+        console.error('Approve subscription error:', error);
+        throw error;
+    }
+};
+
+const updateLeadInfo = async (id, data) => {
+    try {
+        const response = await api.patch(`admin/users/${id}/lead-info`, data);
+        return response.data;
+    } catch (error) {
+        console.error('Update lead info error:', error);
         throw error;
     }
 };
@@ -58,6 +78,8 @@ export default {
     listUsers,
     getUser,
     activateUser,
-    deactivateUser,
-    deleteUser
+    toggleStatus,
+    listPendingSubscriptions,
+    approveSubscription,
+    updateLeadInfo
 };

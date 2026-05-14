@@ -10,10 +10,14 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { toast } from "sonner";
 import { PageHeader } from "@/components/admin/PageHeader";
-import { Shield, ShieldOff, Search, Loader2, Power, PowerOff, Building2, User as UserIcon, Users, Calendar, MapPin, Briefcase, Zap, Star, CheckCircle2, AlertCircle, Trash2, ChevronLeft, ChevronRight, Eye, X } from "lucide-react";
+import { Shield, ShieldOff, Search, Loader2, Power, PowerOff, Building2, User as UserIcon, Users, Calendar, MapPin, Briefcase, Zap, Star, CheckCircle2, AlertCircle, Trash2, ChevronLeft, ChevronRight, Eye, X, MessageSquare, Clock, Phone, MousePointer2 } from "lucide-react";
 import usersService from "@/service/users";
 import plansService from "@/service/plans";
 import { confirmAction } from "@/lib/alerts";
+
+const LEAD_STATUS_OPTIONS = [
+  "New Lead", "Call Not Answered", "Interested", "Not Interested", "Follow-Up", "Appointment Booked", "Payment Pending", "Closed"
+];
 
 export default function UsersPage() {
   const [users, setUsers] = useState<any[]>([]);
@@ -89,37 +93,34 @@ export default function UsersPage() {
     }
   };
 
-  const handleDeactivate = async (user: any) => {
+  const handleToggleStatus = async (user: any) => {
+    const isSuspending = user.isActive;
     const confirmed = await confirmAction({
-      title: "Deactivate Account",
-      text: `Are you sure you want to deactivate ${user.name || 'this user'}? This will stop all their active services.`,
-      confirmButtonText: "Yes, deactivate",
-      isDestructive: true
+      title: isSuspending ? "Suspend Access" : "Restore Access",
+      text: isSuspending
+        ? `Are you sure you want to suspend access for ${user.name}? Their data will remain safe, but they will lose premium features until reactivated.`
+        : `Ready to restore premium access for ${user.name}? This will immediately enable their features.`,
+      confirmButtonText: isSuspending ? "Yes, Suspend" : "Yes, Restore",
+      isDestructive: isSuspending
     });
+
     if (!confirmed) return;
     try {
-      await usersService.deactivateUser(user.id);
-      toast.success(`${user.name} deactivated`);
+      await usersService.toggleStatus(user.id);
+      toast.success(isSuspending ? "Account Suspended" : "Account Reactivated");
       fetchData(currentPage);
     } catch (error: any) {
-      toast.error(error.response?.data?.message || "Deactivation failed");
+      toast.error(error.response?.data?.message || "Status update failed");
     }
   };
 
-  const handleDelete = async (user: any) => {
-    const confirmed = await confirmAction({
-      title: "PERMANENT REMOVAL",
-      text: `Are you sure you want to delete ${user.name || 'this user'}? This will permanently remove their profile, leads, and all ad reports. This action CANNOT be undone.`,
-      confirmButtonText: "Yes, delete",
-      isDestructive: true
-    });
-    if (!confirmed) return;
+  const handleUpdateLeadInfo = async (userId: string, data: any) => {
     try {
-      await usersService.deleteUser(user.id);
-      toast.success(`${user.name} and all data has been permanently deleted`);
+      await usersService.updateLeadInfo(userId, data);
+      toast.success("Lead information updated");
       fetchData(currentPage);
     } catch (error: any) {
-      toast.error(error.response?.data?.message || "Deletion failed");
+      toast.error(error.response?.data?.message || "Update failed");
     }
   };
 
@@ -136,11 +137,22 @@ export default function UsersPage() {
           <TableHeader className="bg-muted/50">
             <TableRow>
               <TableHead className="font-bold text-[11px] uppercase tracking-wider">Account</TableHead>
-              <TableHead className="font-bold text-[11px] uppercase tracking-wider">Business</TableHead>
-              <TableHead className="font-bold text-[11px] uppercase tracking-wider">Type</TableHead>
-              <TableHead className="font-bold text-[11px] uppercase tracking-wider">City</TableHead>
-              <TableHead className="font-bold text-[11px] uppercase tracking-wider">Plan Status</TableHead>
-              <TableHead className="font-bold text-[11px] uppercase tracking-wider">Onboarding</TableHead>
+              {title === "Premium Members" ? (
+                <>
+                  <TableHead className="font-bold text-[11px] uppercase tracking-wider">Active Plan</TableHead>
+                  <TableHead className="font-bold text-[11px] uppercase tracking-wider">Start Date</TableHead>
+                  <TableHead className="font-bold text-[11px] uppercase tracking-wider">Expiry Date</TableHead>
+                  <TableHead className="font-bold text-[11px] uppercase tracking-wider">Renewal Status</TableHead>
+                  <TableHead className="font-bold text-[11px] uppercase tracking-wider">Account Status</TableHead>
+                </>
+              ) : (
+                <>
+                  <TableHead className="font-bold text-[11px] uppercase tracking-wider">Signup & Last Seen</TableHead>
+                  <TableHead className="font-bold text-[11px] uppercase tracking-wider">Lead Status</TableHead>
+                  <TableHead className="font-bold text-[11px] uppercase tracking-wider">Follow-up</TableHead>
+                  <TableHead className="font-bold text-[11px] uppercase tracking-wider">Notes</TableHead>
+                </>
+              )}
               <TableHead className="text-center font-bold text-[11px] uppercase tracking-wider">Actions</TableHead>
             </TableRow>
           </TableHeader>
@@ -153,48 +165,134 @@ export default function UsersPage() {
                     <span className="text-[11px] text-muted-foreground font-medium">{u.phone}</span>
                   </div>
                 </TableCell>
-                <TableCell>
-                  <span className="font-medium text-[13px]">{u.businessName || "—"}</span>
-                </TableCell>
-                <TableCell>
-                  {u.businessType ? (
-                    <span className="text-[12px] font-semibold text-muted-foreground whitespace-nowrap">{u.businessType}</span>
-                  ) : (
-                    <span className="text-[12px] text-muted-foreground/50 italic">Not set</span>
-                  )}
-                </TableCell>
-                <TableCell>
-                  <span className="text-xs text-muted-foreground font-medium"> {u.city || "—"}</span>
-                </TableCell>
-                <TableCell>
-                  <div className="flex items-center gap-2">
-                    <div className={`w-1.5 h-1.5 rounded-full ${u.isActive ? 'bg-green-500 animate-pulse' : 'bg-slate-300'}`} />
-                    <span className={`text-[11px] font-bold ${u.isActive ? 'text-green-600' : 'text-slate-500'}`}>
-                      {u.isActive ? 'Active Plan' : 'No Plan'}
-                    </span>
-                  </div>
-                </TableCell>
-                <TableCell>
-                  {u.isOnboarded ? (
-                    <div className="flex items-center gap-1.5 text-green-600 font-bold text-[10px] uppercase">
-                      <CheckCircle2 className="w-3.5 h-3.5" /> Complete
-                    </div>
-                  ) : (
-                    <div className="flex items-center gap-1.5 text-orange-500 font-bold text-[10px] uppercase">
-                      <AlertCircle className="w-3.5 h-3.5" /> Pending
-                    </div>
-                  )}
-                </TableCell>
+
+                {title === "Premium Members" ? (
+                  <>
+                    <TableCell>
+                      <span className="font-bold text-[13px] text-primary">{u.subscriptions?.[0]?.plan?.name || "Trial Partner"}</span>
+                    </TableCell>
+                    <TableCell>
+                      <span className="font-medium text-xs">
+                        {u.subscriptions?.[0]?.startDate ? new Date(u.subscriptions[0].startDate).toLocaleDateString(undefined, { day: 'numeric', month: 'short' }) : "—"}
+                      </span>
+                    </TableCell>
+                    <TableCell>
+                      <span className="font-medium text-xs">
+                        {u.subscriptions?.[0]?.expiryDate ? new Date(u.subscriptions[0].expiryDate).toLocaleDateString(undefined, { day: 'numeric', month: 'short' }) : "—"}
+                      </span>
+                    </TableCell>
+                    <TableCell>
+                      <Badge variant="outline" className="bg-blue-50 text-blue-700 border-blue-100 text-[10px] font-black uppercase tracking-widest px-2">Manual</Badge>
+                    </TableCell>
+                    <TableCell>
+                      {(() => {
+                        const expiry = u.subscriptions?.[0]?.expiryDate;
+                        const isExpired = expiry && new Date(expiry) < new Date();
+                        const status = !u.isActive ? "Disabled" : (isExpired ? "Expired" : "Active");
+                        const color = status === "Active" ? "text-emerald-600 bg-emerald-50 border-emerald-100" : (status === "Expired" ? "text-rose-600 bg-rose-50 border-rose-100" : "text-slate-500 bg-slate-50 border-slate-100");
+
+                        return (
+                          <Badge className={`${color} border font-black text-[9px] uppercase tracking-widest px-2 shadow-none`}>
+                            {status}
+                          </Badge>
+                        );
+                      })()}
+                    </TableCell>
+                  </>
+                ) : (
+                  <>
+                    <TableCell>
+                      <div className="flex flex-col gap-1">
+                        <div className="flex items-center gap-1.5 text-muted-foreground">
+                          <Clock className="w-3 h-3" />
+                          <span className="text-[11px] font-medium whitespace-nowrap">{new Date(u.createdAt).toLocaleDateString(undefined, { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' })}</span>
+                        </div>
+                        <div className="flex items-center gap-1.5 text-primary/60">
+                          <MousePointer2 className="w-3 h-3" />
+                          <span className="text-[10px] font-bold uppercase tracking-tighter">
+                            {u.lastActivity ? `Last Seen: ${new Date(u.lastActivity).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}` : "New Lead"}
+                          </span>
+                        </div>
+                      </div>
+                    </TableCell>
+                    <TableCell>
+                      <Select defaultValue={u.leadStatus || "New Lead"} onValueChange={(val) => handleUpdateLeadInfo(u.id, { leadStatus: val })}>
+                        <SelectTrigger className="h-8 text-[11px] font-bold w-[140px] bg-background border-primary/10">
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {LEAD_STATUS_OPTIONS.map(opt => <SelectItem key={opt} value={opt} className="text-xs font-semibold">{opt}</SelectItem>)}
+                        </SelectContent>
+                      </Select>
+                    </TableCell>
+                    <TableCell>
+                      <div className="flex flex-col gap-1">
+                        <Input
+                          type="date"
+                          defaultValue={u.nextFollowUpDate || ""}
+                          className="h-8 text-[10px] font-bold w-[110px] p-1 pr-0"
+                          onBlur={(e) => {
+                            if (e.target.value !== (u.nextFollowUpDate || "")) {
+                              handleUpdateLeadInfo(u.id, { nextFollowUpDate: e.target.value });
+                            }
+                          }}
+                        />
+                      </div>
+                    </TableCell>
+                    <TableCell>
+                      <Dialog>
+                        <DialogTrigger asChild>
+                          <Button variant="ghost" size="sm" className="h-8 px-2 text-primary hover:bg-primary/5">
+                            <MessageSquare className="w-3.5 h-3.5 mr-1" />
+                            <span className="text-[10px] font-bold">{u.adminNotes ? "View Notes" : "Add Note"}</span>
+                          </Button>
+                        </DialogTrigger>
+                        <DialogContent className="max-w-md rounded-2xl">
+                          <DialogHeader>
+                            <DialogTitle className="flex items-center gap-2">
+                              <MessageSquare className="w-5 h-5 text-primary" /> Admin Notes
+                            </DialogTitle>
+                            <DialogDescription className="text-xs font-medium">Update internal tracking notes for {u.name}.</DialogDescription>
+                          </DialogHeader>
+                          <div className="py-4">
+                            <textarea
+                              className="w-full min-h-[150px] p-3 rounded-xl border border-input bg-background text-sm font-medium focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/20"
+                              defaultValue={u.adminNotes || ""}
+                              placeholder="Type your notes here..."
+                              onBlur={(e) => {
+                                if (e.target.value !== (u.adminNotes || "")) {
+                                  handleUpdateLeadInfo(u.id, { adminNotes: e.target.value });
+                                }
+                              }}
+                            />
+                          </div>
+                          <DialogFooter>
+                            <DialogTrigger asChild>
+                              <Button className="w-full rounded-xl font-bold text-xs uppercase">Done</Button>
+                            </DialogTrigger>
+                          </DialogFooter>
+                        </DialogContent>
+                      </Dialog>
+                    </TableCell>
+                  </>
+                )}
                 <TableCell className="text-center">
                   <div className="flex items-center justify-center gap-2">
                     {u.isActive ? (
-                      <Button size="sm" variant="ghost" className="h-8 px-3 text-xs font-bold text-destructive hover:bg-destructive/5 hover:text-destructive" onClick={() => handleDeactivate(u)}>
-                        <PowerOff className="w-3.5 h-3.5 mr-1.5" /> Deactivate
+                      <Button size="sm" variant="ghost" className="h-8 px-3 text-xs font-bold text-destructive hover:bg-destructive/5 hover:text-destructive" onClick={() => handleToggleStatus(u)}>
+                        <PowerOff className="w-3.5 h-3.5 mr-1.5" /> Suspend
                       </Button>
                     ) : (
-                      <Button size="sm" variant="outline" className="h-8 px-4 text-xs font-bold border-primary/20 text-primary hover:bg-primary hover:text-white transition-all shadow-sm" onClick={() => setActivatingUser(u)}>
-                        <Shield className="w-3.5 h-3.5 mr-1.5" /> Activate
-                      </Button>
+                      <div className="flex gap-1.5">
+                        <Button size="sm" variant="outline" className="h-8 px-4 text-xs font-bold border-primary/20 text-primary hover:bg-primary hover:text-white transition-all shadow-sm" onClick={() => setActivatingUser(u)}>
+                          <Shield className="w-3.5 h-3.5 mr-1.5" /> {u.subscriptions?.length > 0 ? "Renew Plan" : "Activate"}
+                        </Button>
+                        {u.subscriptions?.length > 0 && (
+                          <Button size="sm" variant="ghost" className="h-8 px-3 text-xs font-bold text-emerald-600 hover:bg-emerald-50 hover:text-emerald-700" onClick={() => handleToggleStatus(u)}>
+                            <CheckCircle2 className="w-3.5 h-3.5 mr-1.5" /> Quick Reactivate
+                          </Button>
+                        )}
+                      </div>
                     )}
                     <Button
                       size="icon"
@@ -203,14 +301,6 @@ export default function UsersPage() {
                       onClick={() => setViewingUser(u)}
                     >
                       <Eye className="w-3.5 h-3.5" />
-                    </Button>
-                    <Button
-                      size="icon"
-                      variant="ghost"
-                      className="h-8 w-8 text-muted-foreground/40 hover:text-destructive hover:bg-destructive/5"
-                      onClick={() => handleDelete(u)}
-                    >
-                      <Trash2 className="w-3.5 h-3.5" />
                     </Button>
                   </div>
                 </TableCell>

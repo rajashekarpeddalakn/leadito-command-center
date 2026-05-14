@@ -6,12 +6,14 @@ import { Textarea } from "@/components/ui/textarea";
 import { Card, CardContent } from "@/components/ui/card";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogFooter } from "@/components/ui/dialog";
 import { Switch } from "@/components/ui/switch";
-import { Plus, Pencil, Trash2, Check, Loader2, Package } from "lucide-react";
+import { Plus, Pencil, Trash2, Check, Loader2, Package, Link, Save } from "lucide-react";
 import { toast } from "sonner";
 import { PageHeader } from "@/components/admin/PageHeader";
 import plansService from "@/service/plans";
 import { Badge } from "@/components/ui/badge";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { confirmAction } from "@/lib/alerts";
+import api from "@/service/api";
 
 const empty: any = {
   name: "",
@@ -20,8 +22,19 @@ const empty: any = {
   adBudget: "",
   expectedLeads: "",
   features: "",
-  isActive: true
+  isActive: true,
+  paymentLink: "",
+  highlightTag: "None"
 };
+
+const TAG_OPTIONS = [
+  "None",
+  "Most Popular",
+  "Festival Offer",
+  "Limited Offer",
+  "Recommended",
+  "Trial Offer"
+];
 
 export default function PlansPage() {
   const [items, setItems] = useState<any[]>([]);
@@ -150,6 +163,26 @@ export default function PlansPage() {
     }
   };
 
+  const togglePlanStatus = async (plan: any, isLive: boolean) => {
+    try {
+      // Create a clean payload for status update
+      const payload = {
+        ...plan,
+        isActive: isLive,
+        // Ensure features are correctly formatted for the backend update
+        features: Array.isArray(plan.features) ? plan.features.map((f: any) => typeof f === 'string' ? f : f?.text) : []
+      };
+
+      await plansService.updatePlan(plan.id, payload);
+      toast.success(`Plan ${isLive ? 'Published' : 'Hidden'} successfully`);
+
+      // Update local state for instant feedback without full re-fetch if possible
+      setItems(prev => prev.map(item => item.id === plan.id ? { ...item, isActive: isLive } : item));
+    } catch (error) {
+      toast.error("Failed to update plan status");
+    }
+  };
+
   return (
     <div className="animate-fade-in space-y-6 pb-10">
       <PageHeader title="Plans & Pricing" description={`Manage subscription tiers and pricing plans (${pagination.totalItems} total). Optimized scroll activated.`}
@@ -160,52 +193,76 @@ export default function PlansPage() {
                 <Plus className="w-4 h-4 mr-2" />Add plan
               </Button>
             </DialogTrigger>
-            <DialogContent className="max-w-lg">
+            <DialogContent className="max-w-xl">
               <DialogHeader><DialogTitle>{editing.id ? "Edit" : "Add"} Plan</DialogTitle></DialogHeader>
-              <div className="space-y-4 py-2">
-                <div className="grid grid-cols-2 gap-4">
-                  <div className="space-y-1.5">
-                    <Label className="text-[11px] uppercase font-bold text-muted-foreground">Plan Name</Label>
-                    <Input value={editing.name} onChange={e => setEditing({ ...editing, name: e.target.value })} placeholder="e.g. Professional" className="h-9 font-medium" />
+              <div className="space-y-3 py-1">
+                <div className="grid grid-cols-3 gap-3">
+                  <div className="space-y-1">
+                    <Label className="text-[10px] uppercase font-bold text-muted-foreground">Plan Name</Label>
+                    <Input value={editing.name} onChange={e => setEditing({ ...editing, name: e.target.value })} placeholder="e.g. Pro" className="h-8 text-xs font-medium" />
                   </div>
-                  <div className="space-y-1.5">
-                    <Label className="text-[11px] uppercase font-bold text-muted-foreground">Price (₹)</Label>
-                    <Input type="number" value={editing.price} onChange={e => setEditing({ ...editing, price: e.target.value })} className="h-9 font-medium" />
+                  <div className="space-y-1">
+                    <Label className="text-[10px] uppercase font-bold text-muted-foreground">Price (₹)</Label>
+                    <Input type="number" value={editing.price} onChange={e => setEditing({ ...editing, price: e.target.value })} className="h-8 text-xs font-medium" />
                   </div>
-                </div>
-
-                <div className="grid grid-cols-2 gap-4">
-                  <div className="space-y-1.5">
-                    <Label className="text-[11px] uppercase font-bold text-muted-foreground">Duration (Days)</Label>
-                    <Input type="number" value={editing.durationDays} onChange={e => setEditing({ ...editing, durationDays: e.target.value })} className="h-9 font-medium" />
-                  </div>
-                  <div className="flex items-center gap-3 pt-6">
-                    <Switch checked={editing.isActive} onCheckedChange={(v) => setEditing({ ...editing, isActive: v })} />
-                    <Label className="text-[11px] uppercase font-bold text-muted-foreground">Active Status</Label>
+                  <div className="space-y-1">
+                    <Label className="text-[10px] uppercase font-bold text-muted-foreground">Duration (Days)</Label>
+                    <Input type="number" value={editing.durationDays} onChange={e => setEditing({ ...editing, durationDays: e.target.value })} className="h-8 text-xs font-medium" />
                   </div>
                 </div>
 
-                <div className="grid grid-cols-2 gap-4">
-                  <div className="space-y-1.5">
-                    <Label className="text-[11px] uppercase font-bold text-muted-foreground">Ad Budget (Text)</Label>
-                    <Input value={editing.adBudget ?? ""} onChange={e => setEditing({ ...editing, adBudget: e.target.value })} placeholder="e.g. ₹50k/mo" className="h-9 font-medium" />
+                <div className="grid grid-cols-3 gap-3">
+                  <div className="space-y-1">
+                    <Label className="text-[10px] uppercase font-bold text-muted-foreground">Ad Budget</Label>
+                    <Input value={editing.adBudget ?? ""} onChange={e => setEditing({ ...editing, adBudget: e.target.value })} placeholder="e.g. 50k" className="h-8 text-xs font-medium" />
                   </div>
-                  <div className="space-y-1.5">
-                    <Label className="text-[11px] uppercase font-bold text-muted-foreground">Expected Leads</Label>
-                    <Input value={editing.expectedLeads ?? ""} onChange={e => setEditing({ ...editing, expectedLeads: e.target.value })} placeholder="e.g. 50-100" className="h-9 font-medium" />
+                  <div className="space-y-1">
+                    <Label className="text-[10px] uppercase font-bold text-muted-foreground">Expected Leads</Label>
+                    <Input value={editing.expectedLeads ?? ""} onChange={e => setEditing({ ...editing, expectedLeads: e.target.value })} placeholder="e.g. 50-100" className="h-8 text-xs font-medium" />
+                  </div>
+                  <div className="space-y-1">
+                    <Label className="text-[10px] uppercase font-bold text-primary">Highlight Tag</Label>
+                    <Select value={editing.highlightTag || "None"} onValueChange={(v) => setEditing({ ...editing, highlightTag: v })}>
+                      <SelectTrigger className="h-8 text-xs font-semibold">
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {TAG_OPTIONS.map(tag => <SelectItem key={tag} value={tag} className="text-xs">{tag}</SelectItem>)}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                </div>
+                <div className="grid grid-cols-12 gap-4">
+                  <div className="col-span-8 space-y-1">
+                    <Label className="text-[10px] uppercase font-bold text-muted-foreground">Features (one per line)</Label>
+                    <Textarea rows={2} value={editing.features} onChange={e => setEditing({ ...editing, features: e.target.value })} placeholder="Verified Leads&#10;CRM Access" className="text-xs font-medium resize-none min-h-[60px]" />
+                  </div>
+                  <div className="col-span-4 flex flex-col justify-center gap-2 pt-4">
+                    <div className="flex items-center gap-2">
+                      <Switch checked={editing.isActive} onCheckedChange={(v) => setEditing({ ...editing, isActive: v })} className="scale-75" />
+                      <Label className="text-[10px] uppercase font-bold text-muted-foreground">Active</Label>
+                    </div>
+                    <p className="text-[8px] text-muted-foreground italic leading-tight">Controls visibility in mobile app.</p>
                   </div>
                 </div>
 
-                <div className="space-y-1.5">
-                  <Label className="text-[11px] uppercase font-bold text-muted-foreground">Features (one per line)</Label>
-                  <Textarea rows={4} value={editing.features} onChange={e => setEditing({ ...editing, features: e.target.value })} placeholder="Verified Leads&#10;CRM Access" className="font-medium resize-none shadow-none" />
+                <div className="space-y-1">
+                  <Label className="text-[10px] uppercase font-bold text-primary flex items-center gap-1.5">
+                    <Link className="w-3 h-3" /> Razorpay Link
+                  </Label>
+                  <Input
+                    value={editing.paymentLink ?? ""}
+                    onChange={e => setEditing({ ...editing, paymentLink: e.target.value })}
+                    placeholder="https://rzp.io/rzp/..."
+                    className="h-8 text-xs font-bold border-primary/20 bg-primary/5 focus:bg-background transition-colors"
+                  />
                 </div>
               </div>
-              <DialogFooter className="bg-muted/30 -mx-6 -mb-6 p-6 mt-6">
-                <Button variant="ghost" onClick={() => setOpen(false)} disabled={loading} className="font-bold">Cancel</Button>
-                <Button onClick={save} disabled={loading} className="font-bold px-8">
+              <DialogFooter className="bg-muted/30 -mx-6 -mb-6 px-6 py-4 mt-4">
+                <Button variant="ghost" onClick={() => setOpen(false)} disabled={loading} className="font-bold h-9">Cancel</Button>
+                <Button onClick={save} disabled={loading} className="font-bold px-8 h-9">
                   {loading && <Loader2 className="w-4 h-4 mr-2 animate-spin" />}
-                  {editing.id ? "Update Tier" : "Create Tier"}
+                  {editing.id ? "Update" : "Create"}
                 </Button>
               </DialogFooter>
             </DialogContent>
@@ -214,7 +271,7 @@ export default function PlansPage() {
       />
 
       {fetching ? (
-        <div className="h-64 flex flex-col items-center justify-center gap-4 text-muted-foreground">
+        <div className="h-64 flex flex-col items-center justify-center gap-4 text-muted-foreground" >
           <Loader2 className="w-10 h-10 animate-spin text-primary/40" />
           <p className="animate-pulse text-sm font-medium">Synchronizing pricing tiers...</p>
         </div>
@@ -224,14 +281,14 @@ export default function PlansPage() {
             {items.map((p, idx) => (
               <Card key={p.id} className={`animate-in fade-in slide-in-from-bottom-4 duration-500 shadow-sm border-border/40 hover:border-primary/30 transition-all duration-300 relative group overflow-hidden rounded-xl bg-card ${p.price > 10000 ? "ring-2 ring-primary/10 border-primary/20" : ""}`} style={{ animationDelay: `${(idx % 12) * 50}ms` }}>
                 {!p.isActive && (
-                  <div className="absolute inset-0 bg-background/60 backdrop-blur-[2px] z-20 flex items-center justify-center">
-                    <Badge variant="destructive" className="font-bold px-4 py-1 uppercase tracking-widest text-[10px]">Disabled</Badge>
+                  <div className="absolute top-0 left-0 right-0 bottom-[64px] bg-background/60 backdrop-blur-[1px] z-20 flex items-center justify-center pointer-events-none">
+                    <Badge variant="destructive" className="font-bold px-4 py-1 uppercase tracking-widest text-[10px] shadow-lg pointer-events-auto">Hidden</Badge>
                   </div>
                 )}
                 <CardContent className="p-0">
                   <div className="p-6 pb-4 space-y-4">
                     <div className="space-y-1">
-                      <h3 className="text-lg font-bold tracking-tight text-foreground/90 uppercase">{p.name}</h3>
+                      <h3 className="text-lg font-bold tracking-tight text-foreground/90 uppercase leading-tight line-clamp-2 min-h-[1.5rem]">{p.name}</h3>
                       <div className="flex items-baseline gap-1">
                         <span className="text-3xl font-bold tracking-tighter">₹{p.price}</span>
                         <span className="text-[10px] text-muted-foreground uppercase font-bold">{p.durationDays} Days</span>
@@ -250,7 +307,7 @@ export default function PlansPage() {
                     </div>
                   </div>
 
-                  <div className="px-6 py-4 space-y-3 min-h-[160px]">
+                  <div className="px-6 py-4 space-y-3">
                     <p className="text-[10px] uppercase font-bold text-muted-foreground tracking-widest">Included Features</p>
                     <ul className="space-y-2">
                       {(Array.isArray(p.features) ? p.features : []).map((f: any, i: number) => (
@@ -258,7 +315,7 @@ export default function PlansPage() {
                           <div className="h-4 w-4 rounded-full bg-emerald-500/10 flex items-center justify-center shrink-0 mt-0.5">
                             <Check className="w-3 h-3 text-emerald-600" />
                           </div>
-                          <span className="text-[12px] font-medium text-muted-foreground/90 leading-tight">
+                          <span className="text-[12px] font-medium text-muted-foreground/90 leading-tight break-words flex-1">
                             {typeof f === 'string' ? f : f?.text}
                           </span>
                         </li>
@@ -266,16 +323,28 @@ export default function PlansPage() {
                     </ul>
                   </div>
 
-                  <div className="p-4 bg-muted/20 border-t flex items-center justify-between mt-2">
-                    <div className="flex gap-1.5">
-                      <Button size="icon" variant="ghost" className="h-8 w-8 text-destructive hover:bg-destructive/10" onClick={() => remove(p.id)}>
-                        <Trash2 className="w-3.5 h-3.5" />
-                      </Button>
-                      <Button size="icon" variant="ghost" className="h-8 w-8 text-muted-foreground hover:bg-accent" onClick={() => openEdit(p)}>
-                        <Pencil className="w-3.5 h-3.5" />
-                      </Button>
+                  <div className="p-3 bg-muted/20 border-t flex items-center justify-between mt-2 relative z-30">
+                    <div className="flex items-center gap-3">
+                      <div className="flex gap-1 border-r border-border/60 pr-2 mr-0.5">
+                        <Button size="icon" variant="ghost" className="h-7 w-7 text-destructive hover:bg-destructive/10" onClick={() => remove(p.id)}>
+                          <Trash2 className="w-3 h-3" />
+                        </Button>
+                        <Button size="icon" variant="ghost" className="h-7 w-7 text-muted-foreground hover:bg-accent" onClick={() => openEdit(p)}>
+                          <Pencil className="w-3 h-3" />
+                        </Button>
+                      </div>
+                      <div className="flex items-center gap-1.5">
+                        <Switch
+                          checked={p.isActive}
+                          onCheckedChange={(val) => togglePlanStatus(p, val)}
+                          className="scale-[0.6] origin-left"
+                        />
+                        <span className={`text-[8px] font-black uppercase tracking-tighter ${p.isActive ? 'text-emerald-600' : 'text-rose-500'}`}>
+                          {p.isActive ? 'Live' : 'Hidden'}
+                        </span>
+                      </div>
                     </div>
-                    <Badge variant="outline" className="text-[9px] font-bold text-muted-foreground/50 border-muted-foreground/20">ID #{p.id}</Badge>
+                    <Badge variant="outline" className="text-[8px] font-bold text-muted-foreground/40 border-muted-foreground/10 italic">ID #{p.id}</Badge>
                   </div>
                 </CardContent>
               </Card>
@@ -315,6 +384,6 @@ export default function PlansPage() {
           </div>
         </div>
       )}
-    </div>
+    </div >
   );
 }

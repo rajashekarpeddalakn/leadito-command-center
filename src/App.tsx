@@ -17,6 +17,7 @@ import AdResultsPage from "./pages/admin/AdResultsPage.tsx";
 import LeadsPage from "./pages/admin/LeadsPage.tsx";
 import LeadDetailPage from "./pages/admin/LeadDetailPage.tsx";
 import UsersPage from "./pages/admin/UsersPage.tsx";
+import PendingPaymentsPage from "./pages/admin/PendingPaymentsPage.tsx";
 
 const queryClient = new QueryClient();
 
@@ -46,6 +47,7 @@ const App = () => (
             <Route path="leads" element={<LeadsPage />} />
             <Route path="leads/:userId" element={<LeadDetailPage />} />
             <Route path="users" element={<UsersPage />} />
+            <Route path="approvals" element={<PendingPaymentsPage />} />
           </Route>
           <Route path="*" element={<NotFound />} />
         </Routes>
