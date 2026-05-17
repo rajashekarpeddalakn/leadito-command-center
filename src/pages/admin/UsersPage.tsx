@@ -12,8 +12,8 @@ import { toast } from "sonner";
 import { PageHeader } from "@/components/admin/PageHeader";
 import { Shield, ShieldOff, Search, Loader2, Power, PowerOff, Building2, User as UserIcon, Users, Calendar, MapPin, Briefcase, Zap, Star, CheckCircle2, AlertCircle, Trash2, ChevronLeft, ChevronRight, Eye, X, MessageSquare, Clock, Phone, MousePointer2 } from "lucide-react";
 import usersService from "@/service/users";
-import plansService from "@/service/plans";
 import { confirmAction } from "@/lib/alerts";
+import { DatePicker } from "@/components/ui/date-picker";
 
 const LEAD_STATUS_OPTIONS = [
   "New Lead", "Call Not Answered", "Interested", "Not Interested", "Follow-Up", "Appointment Booked", "Payment Pending", "Closed"
@@ -21,12 +21,9 @@ const LEAD_STATUS_OPTIONS = [
 
 export default function UsersPage() {
   const [users, setUsers] = useState<any[]>([]);
-  const [plans, setPlans] = useState<any[]>([]);
   const [fetching, setFetching] = useState(true);
   const [searchQuery, setSearchQuery] = useState("");
 
-  const [activatingUser, setActivatingUser] = useState<any>(null);
-  const [selectedPlanId, setSelectedPlanId] = useState<string>("");
   const [actionLoading, setActionLoading] = useState(false);
 
   const [activePage, setActivePage] = useState(1);
@@ -53,18 +50,14 @@ export default function UsersPage() {
   const fetchData = async (pageNum = 1) => {
     try {
       setFetching(true);
-      const [usersData, plansData] = await Promise.all([
-        usersService.listUsers({
-          page: pageNum,
-          limit: 5,
-          isActive: activeTab === "active",
-          search: searchQuery
-        }),
-        plansService.listPlans()
-      ]);
+      const usersData = await usersService.listUsers({
+        page: pageNum,
+        limit: 5,
+        isActive: activeTab === "active",
+        search: searchQuery
+      });
       setUsers(usersData.users || []);
       setPagination(usersData.pagination || { totalPages: 1, totalUsers: 0 });
-      setPlans(plansData);
     } catch (error) {
       toast.error("Failed to load users");
     } finally {
@@ -77,21 +70,6 @@ export default function UsersPage() {
   const paidUsers = useMemo(() => (filteredUsers || []).filter((u: any) => u.isActive), [filteredUsers]);
   const freeUsers = useMemo(() => (filteredUsers || []).filter((u: any) => !u.isActive), [filteredUsers]);
 
-  const handleActivate = async () => {
-    if (!selectedPlanId) return toast.error("Please select a plan for activation");
-    try {
-      setActionLoading(true);
-      await usersService.activateUser(activatingUser.id, selectedPlanId);
-      toast.success(`${activatingUser.name} activated successfully`);
-      setActivatingUser(null);
-      setSelectedPlanId("");
-      fetchData(currentPage);
-    } catch (error: any) {
-      toast.error(error.response?.data?.message || "Activation failed");
-    } finally {
-      setActionLoading(false);
-    }
-  };
 
   const handleToggleStatus = async (user: any) => {
     const isSuspending = user.isActive;
@@ -227,15 +205,14 @@ export default function UsersPage() {
                     </TableCell>
                     <TableCell>
                       <div className="flex flex-col gap-1">
-                        <Input
-                          type="date"
-                          defaultValue={u.nextFollowUpDate || ""}
-                          className="h-8 text-[10px] font-bold w-[110px] p-1 pr-0"
-                          onBlur={(e) => {
-                            if (e.target.value !== (u.nextFollowUpDate || "")) {
-                              handleUpdateLeadInfo(u.id, { nextFollowUpDate: e.target.value });
-                            }
+                        <DatePicker
+                          date={u.nextFollowUpDate ? new Date(u.nextFollowUpDate) : undefined}
+                          setDate={(date) => {
+                            const formatted = date ? date.toISOString().split('T')[0] : "";
+                            handleUpdateLeadInfo(u.id, { nextFollowUpDate: formatted });
                           }}
+                          className="w-[120px] font-bold"
+                          placeholder="Set Follow-up"
                         />
                       </div>
                     </TableCell>
@@ -283,16 +260,9 @@ export default function UsersPage() {
                         <PowerOff className="w-3.5 h-3.5 mr-1.5" /> Suspend
                       </Button>
                     ) : (
-                      <div className="flex gap-1.5">
-                        <Button size="sm" variant="outline" className="h-8 px-4 text-xs font-bold border-primary/20 text-primary hover:bg-primary hover:text-white transition-all shadow-sm" onClick={() => setActivatingUser(u)}>
-                          <Shield className="w-3.5 h-3.5 mr-1.5" /> {u.subscriptions?.length > 0 ? "Renew Plan" : "Activate"}
-                        </Button>
-                        {u.subscriptions?.length > 0 && (
-                          <Button size="sm" variant="ghost" className="h-8 px-3 text-xs font-bold text-emerald-600 hover:bg-emerald-50 hover:text-emerald-700" onClick={() => handleToggleStatus(u)}>
-                            <CheckCircle2 className="w-3.5 h-3.5 mr-1.5" /> Quick Reactivate
-                          </Button>
-                        )}
-                      </div>
+                      <Button size="sm" variant="outline" className="h-8 px-5 rounded-xl text-xs font-bold border-emerald-200 text-emerald-600 hover:bg-emerald-50 hover:border-emerald-300 transition-all shadow-sm" onClick={() => handleToggleStatus(u)}>
+                        <Shield className="w-3.5 h-3.5 mr-1.5" /> {u.subscriptions?.length > 0 ? "Quick Reactivate" : "Activate"}
+                      </Button>
                     )}
                     <Button
                       size="icon"
@@ -499,55 +469,6 @@ export default function UsersPage() {
         </DialogContent>
       </Dialog>
 
-      {/* Activation Dialog */}
-      <Dialog open={!!activatingUser} onOpenChange={(o) => { if (!o) setActivatingUser(null); }}>
-        <DialogContent className="max-w-md rounded-2xl overflow-hidden shadow-2xl transition-all">
-          <DialogHeader className="pb-4">
-            <DialogTitle className="flex items-center gap-2 text-xl font-bold">
-              <Shield className="w-5 h-5 text-primary" /> Activate Membership
-            </DialogTitle>
-            <DialogDescription className="text-xs font-medium text-muted-foreground">
-              Assign a subscription plan to enable premium platform features.
-            </DialogDescription>
-          </DialogHeader>
-          {activatingUser && (
-            <div className="space-y-5 py-2">
-              <div className="bg-muted/50 p-4 rounded-xl border border-border/40">
-                <p className="text-[10px] text-muted-foreground font-bold uppercase mb-1">Activating Account:</p>
-                <div className="flex flex-col">
-                  <span className="font-bold text-base leading-tight">{activatingUser.name}</span>
-                  <span className="text-sm font-medium text-primary">{activatingUser.businessName || "Member Account"}</span>
-                </div>
-              </div>
-              <div className="space-y-2">
-                <Label className="text-xs font-bold text-muted-foreground ml-1">Subscription Plan</Label>
-                <Select value={selectedPlanId} onValueChange={setSelectedPlanId}>
-                  <SelectTrigger className="h-12 border rounded-xl font-semibold bg-background transition-all hover:border-primary/40">
-                    <SelectValue placeholder="Choose a plan..." />
-                  </SelectTrigger>
-                  <SelectContent className="rounded-xl">
-                    {plans.map(p => (
-                      <SelectItem key={p.id} value={String(p.id)} className="py-2.5 font-semibold">
-                        <div className="flex justify-between items-center w-full min-w-[200px]">
-                          <span>{p.name}</span>
-                          <span className="text-primary font-bold">₹{p.price}</span>
-                        </div>
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
-            </div>
-          )}
-          <DialogFooter className="pt-4 border-t gap-2 sm:gap-0">
-            <Button variant="ghost" onClick={() => setActivatingUser(null)} disabled={actionLoading} className="font-bold text-xs uppercase h-10 px-6">Cancel</Button>
-            <Button onClick={handleActivate} disabled={actionLoading || !selectedPlanId} className="h-10 bg-primary text-white hover:bg-primary/90 px-8 rounded-xl font-bold text-xs uppercase shadow-lg shadow-primary/20">
-              {actionLoading ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : <CheckCircle2 className="w-4 h-4 mr-2" />}
-              Activate Member
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
     </div>
   );
 }

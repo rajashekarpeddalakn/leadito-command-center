@@ -18,6 +18,8 @@ import LeadsPage from "./pages/admin/LeadsPage.tsx";
 import LeadDetailPage from "./pages/admin/LeadDetailPage.tsx";
 import UsersPage from "./pages/admin/UsersPage.tsx";
 import PendingPaymentsPage from "./pages/admin/PendingPaymentsPage.tsx";
+import PrivacyPolicy from "./pages/PrivacyPolicy.tsx";
+import TermsConditions from "./pages/TermsConditions.tsx";
 
 const queryClient = new QueryClient();
 
@@ -30,6 +32,8 @@ const App = () => (
         <Routes>
           <Route path="/" element={<Index />} />
           <Route path="/auth" element={<Auth />} />
+          <Route path="/privacy" element={<PrivacyPolicy />} />
+          <Route path="/terms" element={<TermsConditions />} />
           <Route
             path="/admin"
             element={

@@ -44,6 +44,24 @@ const Index = () => {
           ))}
         </div>
       </main>
+
+      <footer className="container border-t border-border/40 py-10 mt-20">
+        <div className="flex flex-col md:flex-row items-center justify-between gap-6">
+          <div className="flex items-center gap-3 opacity-60">
+            <img src={logo} alt="Leadito AI logo" className="w-8 h-8 rounded-lg grayscale" />
+            <span className="font-bold text-sm tracking-tight italic">Leadito AI</span>
+          </div>
+
+          <div className="flex items-center gap-8">
+            <Link to="/privacy" className="text-xs font-bold uppercase tracking-widest text-muted-foreground hover:text-primary transition-colors">Privacy Policy</Link>
+            <Link to="/terms" className="text-xs font-bold uppercase tracking-widest text-muted-foreground hover:text-amber-600 transition-colors">Terms & Conditions</Link>
+          </div>
+
+          <p className="text-[10px] uppercase font-black tracking-[0.2em] text-muted-foreground/40">
+            © 2024 Leadito. All Rights Reserved.
+          </p>
+        </div>
+      </footer>
     </div>
   );
 };
