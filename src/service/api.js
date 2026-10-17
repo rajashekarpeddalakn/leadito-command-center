@@ -1,7 +1,7 @@
 import axios from 'axios';
 import { navigate } from './navigationService';
 
-export const BASE_URL = 'https://leaditoai.com/api/';
+export const BASE_URL = 'https://leadito-be.vercel.app/api/';
 // export const BASE_URL = 'http://localhost:8000/api/';
 
 const api = axios.create({
